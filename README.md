@@ -61,4 +61,89 @@ El cambio a `fetchData` como una función asíncrona en el segundo `useEffect` a
 2. **Mejora en la lectura del código**: Usar `useState` y funciones separadas (`loadParams` y `fetchData`) hace que el código sea más estructurado y fácil de seguir.
 3. **Evita advertencias y errores**: Al manejar `params` como una promesa, Next.js puede funcionar sin problemas sin lanzar advertencias de sincronización o fallos en el acceso.
 
-Estos cambios reflejan buenas prácticas en Next.js y React, especialmente cuando estás trabajando con datos asincrónicos y valores dependientes de promesas como `params`. ¡Así que genial que lo hayas aplicado!
+
+
+
+### Manejo de Parámetros en Rutas Dinámicas en Next.js 15: Simplificación y Mejores Prácticas
+
+Aquí explico los cambios y mejoras que realicé en mi código para manejar rutas dinámicas en Next.js 15. Estos ajustes me permitieron resolver problemas de tipado y mejorar la compatibilidad con esta nueva versión.
+
+1. **Extracción de `id` desde la URL en lugar de `params`:**
+   - **Antes:** Usaba `params` directamente en la función, pasando el parámetro `id` mediante `{ params }: Params`.
+   - **Ahora:** Reemplazo `{ params }` y elimino la interfaz `Params`. En lugar de eso, extraigo el `id` directamente desde la URL del `request` usando:
+     ```typescript
+     const url = new URL(request.url);
+     const id = url.pathname.split('/').pop();
+     ```
+   - **Razón:** En Next.js 15, el segundo argumento `params` no es compatible de manera predeterminada en las rutas de API dinámicas. Por lo tanto, obtener el `id` directamente desde la URL es una alternativa efectiva y funcional.
+
+2. **Conversión de `id` a número después de extraerlo de la URL:**
+   - **Antes:** Convertía `params.id` a número de esta manera:
+     ```typescript
+     const task = await prisma.task.findFirst({
+         where: {
+             id: Number(params.id)
+         }
+     });
+     ```
+   - **Ahora:** Este paso se mantiene, pero aplico `Number(id)` directamente al valor extraído de la URL:
+     ```typescript
+     const task = await prisma.task.findFirst({
+         where: {
+             id: Number(id)
+         }
+     });
+     ```
+   - **Razón:** Prisma requiere que el `id` sea un `number`, por lo que esta conversión asegura que el valor esté en el tipo correcto antes de enviarlo a Prisma.
+
+3. **Manejo de error cuando `id` no está presente:**
+   - **Antes:** No había una validación explícita para verificar si `id` estaba definido antes de usarlo.
+   - **Ahora:** Añadí una verificación:
+     ```typescript
+     if (!id) {
+         return NextResponse.json({ error: "ID not provided" }, { status: 400 });
+     }
+     ```
+   - **Razón:** Esto asegura que el servidor maneje el caso en que `id` no esté presente en la URL, devolviendo un error 400 con un mensaje claro. Así, mejoro la robustez del código.
+
+4. **Eliminación de la interfaz `Params`:**
+   - **Antes:** Usaba una interfaz `Params` para definir `params: { id: string }`.
+   - **Ahora:** Eliminé la necesidad de `Params` debido al cambio en la obtención del `id` desde la URL, lo cual simplifica el código.
+   - **Razón:** En este nuevo enfoque, `Params` se vuelve redundante ya que el `id` es una simple variable extraída del URL en cada función.
+
+### Código Anterior (Resumen)
+```typescript
+interface Params {
+    params: { id: string };
+}
+
+export async function GET(request: Request, { params }: Params) {
+    const task = await prisma.task.findFirst({
+        where: {
+            id: Number(params.id)
+        }
+    });
+    return NextResponse.json(task);
+}
+```
+
+### Código Nuevo (Resumen)
+```typescript
+export async function GET(request: Request) {
+    const url = new URL(request.url);
+    const id = url.pathname.split('/').pop();
+
+    if (!id) {
+        return NextResponse.json({ error: "ID not provided" }, { status: 400 });
+    }
+
+    const task = await prisma.task.findFirst({
+        where: {
+            id: Number(id)
+        }
+    });
+    return NextResponse.json(task);
+}
+```
+
+En resumen, **reemplazo `params` con la extracción directa del `id` desde la URL del `request`** y añado **validación para asegurar la presencia del `id`**. Este enfoque es mucho más compatible con Next.js 15, además de mejorar la claridad y estabilidad de mi código.
